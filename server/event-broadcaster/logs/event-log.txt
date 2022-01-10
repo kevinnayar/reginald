@@ -1,0 +1,21 @@
+{
+  "utcTimestamp": 1641828889981,
+  "eventId": "event_fd6cbaa4-9b0b-4354-b664-442be88a75c8",
+  "event": {
+    "type": "TEAM_CREATE",
+    "data": {
+      "id": "team_6664e4f6-49f7-4116-940a-4fba73efdc62",
+      "name": "teast"
+    }
+  }
+}{
+  "utcTimestamp": 1641828977543,
+  "eventId": "event_9597bb37-dcb2-4f5e-90d9-c2a2504359a5",
+  "event": {
+    "type": "TEAM_CREATE",
+    "data": {
+      "id": "team_d080782c-0e75-4d61-901c-f6cbd756cd6c",
+      "name": "foo"
+    }
+  }
+}

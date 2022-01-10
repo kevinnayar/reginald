@@ -1,0 +1,51 @@
+.alert {
+  font-size: 1rem;
+  padding: 0.75rem 3rem 0.75rem 1.25rem;
+  border-radius: var(--rounded);
+  color: var(--color-white-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 1s ease-in-out;
+  position: relative;
+
+  i {
+    position: absolute;
+    top: 0.55rem;
+    right: 1rem;
+    cursor: pointer;
+    transition: var(--transition1);
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+
+  &--dismissing {
+    opacity: 0;
+  }
+
+  &--error {
+    background: var(--color-error);
+  }
+  
+  &--warning {
+    background: var(--color-warning);
+  }
+
+  &--info {
+    background: var(--color-info);
+  }
+
+  &--success {
+    background: var(--color-success);
+  }
+
+  &--primary {
+    background: var(--color-primary);
+  }
+
+  &--secondary {
+    background: var(--color-secondary);
+  }
+}

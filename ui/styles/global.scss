@@ -1,0 +1,53 @@
+@import './variables.scss';
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  margin-block-start: 0;
+}
+
+p {
+  margin-block-start: 0;
+  margin-block-end: 2em;
+  line-height: 1.71;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-main);
+  padding: 0;
+  margin: 0;
+  transition: var(--transition1);
+}
+
+body.dark {
+  background: var(--color-black-dark);
+  color: var(--color-white-mid);
+}
+
+body.light {
+  background: var(--color-white-mid);
+  color: var(--color-black-mid);
+}
+
+.inner {
+  width: 100%;
+  max-width: 1024px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+
+  @media (max-width: 1024px) {
+    margin: 0 2.5em;
+    width: calc(100% - 5em);
+  }
+}
+
+

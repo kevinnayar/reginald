@@ -1,0 +1,15 @@
+{
+    "include": [
+        "ui/**/*"
+    ],
+    "compilerOptions": {
+        "strict": true,
+        "esModuleInterop": true,
+        "downlevelIteration": true,
+        "lib": [
+            "dom",
+            "es2016"
+        ],
+        "jsx": "react-jsx"
+    }
+}
