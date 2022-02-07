@@ -21,10 +21,12 @@ export function isValidEvent(event: any): boolean {
 }
 
 export function wrapEventWithContext(event: Event): EventWithContext {
-  const withContext: EventWithContext = {
+  const eventWithCtx: EventWithContext = {
     utcTimestamp: Date.now(),
     eventId: `event_${v4()}`,
     event,
   };
-  return withContext;
+  return eventWithCtx;
 }
+
+

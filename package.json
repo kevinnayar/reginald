@@ -49,12 +49,12 @@
     "tslint": "^6.1.1"
   },
   "scripts": {
-    "start:client": "parcel serve ./ui/index.html",
+    "start:client": "parcel serve ./client/index.html",
     "start:server": "nodemon --watch server -e ts --exec npx ts-node ./server/index.ts",
-    "build:client": "rm -rf ./dist && mkdir ./dist && mkdir ./dist/ui && parcel build ./ui/index.html --dist-dir ./dist/ui",
+    "build:client": "rm -rf ./dist && mkdir ./dist && mkdir ./dist/client && parcel build ./client/index.html --dist-dir ./dist/client",
     "test": "NODE_ENV=development jest",
     "test:watch": "NODE_ENV=development jest --watch",
-    "deploy:client": "aws s3 sync ./dist/ui s3://TODO --profile kaynay",
+    "deploy:client": "aws s3 sync ./dist/client s3://TODO --profile kaynay",
     "release:client": "yarn test && yarn build:client && yarn deploy:client"
   },
   "browserslist": [
