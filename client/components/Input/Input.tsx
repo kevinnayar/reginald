@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './input.scss';
 
 type InputProps = {
@@ -7,9 +7,15 @@ type InputProps = {
   onChange: (v: string) => void;
 };
 
-const Input = ({ label, value, onChange }: InputProps) => {
-  const onValueChange = (e: any) => {
-    onChange(e.target.value);
+const Input = ({ label, value, onChange: onChangeCallback }: InputProps) => {
+  const [local, setLocal] = useState(value);
+
+  const onChange = (e: any) => {
+    setLocal(e.target.value);
+  };
+
+  const onBlur = () => {
+    onChangeCallback(local);
   };
 
   return (
@@ -18,8 +24,9 @@ const Input = ({ label, value, onChange }: InputProps) => {
       <input
         className="input__field"
         type="text"
-        value={value}
-        onChange={onValueChange}
+        value={local}
+        onChange={onChange}
+        onBlur={onBlur}
       />
     </div>
   );

@@ -2,14 +2,14 @@ import { useState } from 'react';
 
 export type ThemeType = 'light' | 'dark';
 
-const KEY = 'MARCONI_LAYOUT_UI:THEME';
+const KEY = 'REGINALD:UI:THEME';
 
-export type UseThemeHook = {
-  theme: ThemeType;
-  toggleTheme: () => void;
-};
+export type UseThemeHook = [
+  theme: ThemeType,
+  toggleTheme: () => void,
+];
 
-export function useTheme(): UseThemeHook {
+export default function useTheme(): UseThemeHook {
   const storage: Storage = window.localStorage;
   const savedTheme: null | ThemeType = storage.getItem(KEY) as ThemeType;
   const fallbackTheme: ThemeType = 'light';
@@ -38,10 +38,7 @@ export function useTheme(): UseThemeHook {
     window.localStorage.setItem(KEY, newTheme);
   };
 
-  return {
-    theme,
-    toggleTheme,
-  };
+  return [theme, toggleTheme];
 }
 
 

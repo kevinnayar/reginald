@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import io from 'socket.io-client';
-import { useTheme } from './hooks/useTheme';
-import { Team, User, Event, EventGetTeams, EventGetUsers } from '../shared/types/eventTypes';
+import { Socket } from 'socket.io-client';
+
+import useTheme from './hooks/useTheme';
+import useToggle from './hooks/useToggle';
+import { apiService } from './utils/apiUtils';
+import { getSocket } from './utils/socketUtils';
+import { listMutator } from './utils/listUtils';
+import { getErrorMessage } from '../shared/utils/errorUtils';
+import { Project, User } from './types/baseTypes';
 
 import Page from './components/Page/Page';
 import PageHeader from './components/PageHeader/PageHeader';
@@ -12,387 +18,272 @@ import Alert from './components/Alert/Alert';
 import Button from './components/Button/Button';
 import Cards from './components/Cards/Cards';
 import Card from './components/Card/Card';
-import Hero from './components/Hero/Hero';
 import Input from './components/Input/Input';
-// import Loader from './components/Loader/Loader';
+import Loader from './components/Loader/Loader';
 
 import './styles/global.scss';
 
-const baseUrl = 'http://localhost';
-const apiPort = 3000;
-const socketPort = 8080;
+const api = apiService();
 
-const apiBaseUrl = `${baseUrl}:${apiPort}`;
-const socketBaseUrl = `${baseUrl}:${socketPort}`;
+const HeaderTitle = () => {
+  const flexStyles = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+  return (
+    <div style={flexStyles}>
+      <i className="material-icons">api</i>
+      <h1 style={{ margin: '0 0 0 10px', fontSize: '1.4em' }}>semiterrestrial</h1>
+    </div>
+  );
+};
 
-function createTeam(name: string) {
-  fetch(`${apiBaseUrl}/api/v1/teams`, {
-    method: 'POST',
-    body: JSON.stringify({ name }),
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-}
+type AuthenticatorProps = {
+  onSetUser: (u: undefined | User) => void;
+};
 
-async function createUser(name: string, teamId: string) {
-  fetch(`${apiBaseUrl}/api/v1/users`, {
-    method: 'POST',
-    body: JSON.stringify({ name, teamId }),
-  });
-}
+const Authenticator = ({ onSetUser }: AuthenticatorProps) => {
+  const [loading, setLoading] = useState<boolean>(true);
+  const [email, setEmail] = useState('one@foo.com');
+  const [password, setPassword] = useState('foo');
+  const [user, setUser] = useState<undefined | User>(undefined);
+  const [error, setError] = useState<string>();
 
-
-const App = () => {
-  const socket = io(socketBaseUrl, { withCredentials: true });
-  const [socketId, setSocketId] = useState<null | string>(socket.id);
-  const { theme, toggleTheme } = useTheme();
-
-  const [teamName, setTeamName] = useState('');
-  const onSaveTeam = () => {
-    createTeam(teamName);
-    setTeamName('');
+  const getSelf = async () => {
+    if (!user) {
+      try {
+        const newUser = await api.get<User>('self');
+        if (newUser) {
+          setUser(newUser);
+          onSetUser(newUser);
+        }
+      } catch (e) {
+        // do nothing
+      }
+      setLoading(false);
+    }
   };
 
-  const [userName, setUserName] = useState('');
-  const [teamId, setTeamId] = useState('');
-  const onSaveUser = () => {
-    createUser(userName, teamId);
-    setUserName('');
-    setTeamId('');
+  const login = async () => {
+    try {
+      if (!email || !password) throw new Error('Email and password are required!');
+      const newUser = await api.post<User>('login', { email, password });
+      if (newUser) {
+        setUser(newUser);
+        onSetUser(newUser);
+      } else {
+        throw new Error('Could not log in');
+      }
+    } catch (e) {
+      setError(getErrorMessage(e));
+    }
   };
 
-  const [teams, setTeams] = useState<Record<string, Team>>({});
-  const [users, setUsers] = useState<Record<string, User>>({});
+  const logout = async () => {
+    try {
+      await api.post('logout', { email });
+      setUser(undefined);
+      onSetUser(undefined);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    }
+  };
 
   useEffect(() => {
-    socket.on('connect', () => {
-      if (!socketId) setSocketId(socket.id);
-    });
-  }, [socket, socketId]);
+    getSelf();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  socket.on('GET_TEAMS', (event: EventGetTeams) => setTeams(event.data.teams));
-  socket.on('GET_USERS', (event: EventGetUsers) => setUsers(event.data.users));
+  if (loading) return <Card><Loader /></Card>;
 
+  return (
+    <Card>
+      {!user ? (
+        <>
+          <h2>Login</h2>
+          <Input label="Email" value={email} onChange={setEmail} />
+          <Input label="Password" value={password} onChange={setPassword} />
+          <Button variant="primary" onClick={login} style={{ width: '100%' }}>
+            Login
+          </Button>
+        </>
+
+      ) : (
+        <Button variant="secondary" onClick={logout} style={{ width: '100%' }}>
+          Logout
+        </Button>
+      )}
+      {error && (
+        <Alert variant="error" dismissable>
+          {error}
+        </Alert>
+      )}
+    </Card>
+  );
+};
+
+type ProjectListProps = {
+  projects: undefined | Project[],
+};
+
+const ProjectList = ({ projects }: ProjectListProps) => {
+  const [editing, toggleEditing] = useToggle(false);
+  const [error, setError] = useState<string>();
+
+  const createProject = async () => {
+    try {
+      const name = 'Some Test';
+      const status = 'PENDING';
+      await api.post('projects', { name, status });
+    } catch (e) {
+      setError(getErrorMessage(e));
+    }
+  };
+
+  const updateProject = async (project: Project) => {
+    try {
+      await api.put(`projects/${project.projectId}`, project);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    }
+  };
+
+  const deleteProject = async (projectId: string) => {
+    try {
+      await api.del(`projects/${projectId}`);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    }
+  };
+
+  const hasProjects = Boolean(projects && projects.length);
+
+  const smStyles = {
+    fontSize: '0.8rem',
+    padding: '0.5rem',
+    margin: 0,
+    lineHeight: '1',
+  };
+
+  const lgStyles = {
+    fontSize: '1rem',
+    lineHeight: '1.5rem',
+    padding: '0.5rem',
+    margin: '0 0 1.5rem',
+    border: '2px solid transparent',
+  };
+
+  return (
+    <Card>
+      <h2>
+        Projects{' '}
+        {hasProjects && <Button onClick={toggleEditing} icon="edit" /> }
+      </h2>
+      {error && (
+        <Alert variant="error" dismissable>
+          {error}
+        </Alert>
+      )}
+      {projects && projects.map(({ projectId, name, status }) => (
+        <div key={projectId}>
+          {editing ? (
+            <>
+              <Input
+                label={projectId}
+                value={name}
+                onChange={(newName: string) => {
+                  const newProject: Project = {
+                    projectId,
+                    status,
+                    name: newName,
+                  };
+                  updateProject(newProject);
+                }}
+              />
+              <Button onClick={() => deleteProject(projectId)} icon="delete" />
+            </>
+          ) : (
+            <div>
+              <p style={smStyles}>{projectId}</p>
+              <p style={lgStyles}>{name}</p>
+            </div>
+          )}
+        </div>
+      ))}
+      <Button onClick={createProject} icon="add" />
+    </Card>
+  );
+};
+
+function attachEventHandlersProjects(
+  socket: Socket,
+  projects: Project[],
+  setProjects: (p: Project[]) => void,
+) {
+  const projectsMutator = listMutator<Project>('projectId');
+
+  socket.on('event-project-create', ({ data }: { data: Project }) => {
+    const newProjects = projectsMutator.add(data, projects);
+    setProjects(newProjects);
+  });
+
+  socket.on('event-project-update', ({ data }: { data: Project }) => {
+    const newProjects = projectsMutator.update(data, projects);
+    setProjects(newProjects);
+  });
+
+  socket.on('event-project-delete', ({ data: { id } }: { data: { id: string } }) => {
+    const newProjects = projectsMutator.remove(id, projects);
+    setProjects(newProjects);
+  });
+}
+
+const App = () => {
+  const [theme, toggleTheme] = useTheme();
+  const [socket, setSocket] = useState<Socket>();
+  const [user, setUser] = useState<User>();
+  const [projects, setProjects] = useState<Project[]>();
+
+  const themeColor = theme === 'light' ? 'rgb(9, 113, 241)' : '#ff9800';
+  const themeIcon = theme === 'light' ? 'dark_mode' : 'light_mode';
+
+  useEffect(() => {
+    if (user && !socket) {
+      const postLogin = async () => {
+        const newSocket = getSocket(user);
+        setSocket(newSocket);
+
+        const newProjects: Project[] = await api.get('projects');
+        setProjects(newProjects);
+
+        attachEventHandlersProjects(newSocket, newProjects, setProjects);
+      };
+
+      postLogin();
+    }
+  }, [user, socket]);
+
+  console.log({ user, projects });
 
   return (
     <Page fullWidth>
       <PageHeader>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <i className="material-icons" style={{ marginRight: 10 }}>
-            api
-          </i>
-          <h1 style={{ margin: 0, fontSize: '1.4em' }}>semiterrestrial</h1>
-        </div>
-        <div style={{ marginLeft: 'auto' }}>
-          <Button
-            style={{
-              color: theme === 'light' ? '#ff9800' : 'rgb(9, 113, 241)',
-            }}
-            icon={theme === 'light' ? 'light_mode' : 'dark_mode'}
-            onClick={toggleTheme}
-          />
-        </div>
+        <HeaderTitle />
+        <Button
+          icon={themeIcon}
+          style={{ color: themeColor, marginLeft: 'auto', paddingRight: 0 }}
+          onClick={toggleTheme}
+        />
       </PageHeader>
       <PageContent>
-        <Alert variant="error" dismissable>
-          Something went wrong when trying to save. Please try again.
-        </Alert>
-        <Hero
-          background="linear-gradient(315deg, #9921e8 0%, #5f72be 74%)"
-          color="white"
-          text="Configure once. Deploy anywhere."
-        />
         <Cards numCards={2}>
-          <Card>
-            <h2>Team Form</h2>
-            <Input label="Team name" value={teamName} onChange={setTeamName} />
-            <Button variant="primary" onClick={onSaveTeam}>
-              Create team
-            </Button>
-          </Card>
-          <Card>
-            <h2>User Form</h2>
-            <Input label="User name" value={userName} onChange={setUserName} />
-            <Input label="Team ID" value={teamId} onChange={setTeamId} />
-            <Button variant="primary" onClick={onSaveUser}>
-              Create user
-            </Button>
-          </Card>
-        </Cards>
-
-        <Cards numCards={2}>
-          <Card>
-            <h2>Teams</h2>
-            {Object.values(teams).map((t) => (
-              <pre key={t.id} style={{ background: '#454545', color: '#ccc', padding: '1rem', borderRadius: '0.4rem' }}>
-                - {t.id} | {t.name}
-              </pre>
-            ))}
-          </Card>
-          <Card>
-            <h2>Users</h2>
-            {Object.values(users).map((u) => (
-              <pre key={u.id} style={{ background: '#454545', color: '#ccc', padding: '1rem', borderRadius: '0.4rem' }}>
-                - {u.id} | {u.name} | {u.teamId}
-              </pre>
-            ))}
-          </Card>
-        </Cards>
-
-        <Cards numCards={1}>
-          <Card>
-            <h2>So Metric</h2>
-            <p>
-              Maecenas posuere nisi a augue accumsan, sit amet dapibus quam posuere sit amet dap
-              posuere.
-            </p>
-            <Button variant="primary">Find out more</Button>
-          </Card>
-        </Cards>
-        <Cards numCards={2}>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button variant="primary">Primary</Button>
-          </Card>
-          <Card>
-            <h2>Another Metric</h2>
-            <p>
-              Donec dignissim odio in feugiat accumsan, sem erat elementum tortor, vitae dignissim
-              magna arcu id urna.
-            </p>
-            <Button variant="secondary">Secondary</Button>
-          </Card>
-        </Cards>
-        <Cards numCards={2}>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button outlined variant="primary">
-              Primary
-            </Button>
-          </Card>
-          <Card>
-            <h2>Another Metric</h2>
-            <p>
-              Donec dignissim odio in feugiat accumsan, sem erat elementum tortor, vitae dignissim
-              magna arcu id urna.
-            </p>
-            <Button outlined variant="secondary">
-              Secondary
-            </Button>
-          </Card>
-        </Cards>
-        <Cards numCards={3}>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button variant="primary">Find out more</Button>
-          </Card>
-          <Card>
-            <h2>Another Metric</h2>
-            <p>
-              Donec dignissim odio in feugiat accumsan, sem erat elementum tortor, vitae dignissim
-              magna arcu id urna.
-            </p>
-            <Button variant="primary">Find out more</Button>
-          </Card>
-          <Card>
-            <h2>So Metric</h2>
-            <p>
-              Maecenas posuere nisi a augue accumsan, sit amet dapibus quam posuere sit amet dap
-              posuere.
-            </p>
-            <Button variant="primary">Find out more</Button>
-          </Card>
-        </Cards>
-        <Cards numCards={4}>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button variant="error">Find out error</Button>
-          </Card>
-          <Card>
-            <h2>Another Metric</h2>
-            <p>
-              Donec dignissim odio in feugiat accumsan, sem erat elementum tortor, vitae dignissim
-              magna arcu id urna.
-            </p>
-            <Button variant="warning">Find out warning</Button>
-          </Card>
-          <Card>
-            <h2>So Metric</h2>
-            <p>
-              Maecenas posuere nisi a augue accumsan, sit amet dapibus quam posuere sit amet dap
-              posuere sit amet.
-            </p>
-            <Button variant="info">Find out info</Button>
-          </Card>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button variant="success">Find out success</Button>
-          </Card>
-        </Cards>
-        <Cards numCards={4}>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button outlined variant="error">
-              Find out error
-            </Button>
-          </Card>
-          <Card>
-            <h2>Another Metric</h2>
-            <p>
-              Donec dignissim odio in feugiat accumsan, sem erat elementum tortor, vitae dignissim
-              magna arcu id urna.
-            </p>
-            <Button outlined variant="warning">
-              Find out warning
-            </Button>
-          </Card>
-          <Card>
-            <h2>So Metric</h2>
-            <p>
-              Maecenas posuere nisi a augue accumsan, sit amet dapibus quam posuere sit amet dap
-              posuere sit amet.
-            </p>
-            <Button outlined variant="info">
-              Find out info
-            </Button>
-          </Card>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button outlined variant="success">
-              Find out success
-            </Button>
-          </Card>
-        </Cards>
-        <Cards numCards={4}>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button variant="error" icon="error">
-              Error
-            </Button>
-          </Card>
-          <Card>
-            <h2>Another Metric</h2>
-            <p>
-              Donec dignissim odio in feugiat accumsan, sem erat elementum tortor, vitae dignissim
-              magna arcu id urna.
-            </p>
-            <Button variant="warning" icon="warning">
-              Warning
-            </Button>
-          </Card>
-          <Card>
-            <h2>So Metric</h2>
-            <p>
-              Maecenas posuere nisi a augue accumsan, sit amet dapibus quam posuere sit amet dap
-              posuere sit amet.
-            </p>
-            <Button variant="info" icon="info">
-              Info
-            </Button>
-          </Card>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button variant="success" icon="check_circle">
-              Success
-            </Button>
-          </Card>
-        </Cards>
-        <Cards numCards={4}>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button outlined variant="error" icon="error">
-              Error
-            </Button>
-          </Card>
-          <Card>
-            <h2>Another Metric</h2>
-            <p>
-              Donec dignissim odio in feugiat accumsan, sem erat elementum tortor, vitae dignissim
-              magna arcu id urna.
-            </p>
-            <Button outlined variant="warning" icon="warning">
-              Warning
-            </Button>
-          </Card>
-          <Card>
-            <h2>So Metric</h2>
-            <p>
-              Maecenas posuere nisi a augue accumsan, sit amet dapibus quam posuere sit amet dap
-              posuere sit amet.
-            </p>
-            <Button outlined variant="info" icon="info">
-              Info
-            </Button>
-          </Card>
-          <Card>
-            <h2>Main Metric</h2>
-            <p>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. In at lacus tortor.
-              Suspendisse id dignissim tortor.
-            </p>
-            <Button outlined variant="success" icon="check_circle">
-              Success
-            </Button>
-          </Card>
-        </Cards>
-        <Cards numCards={1}>
-          <Card>
-            <h2>Form</h2>
-            <Input label="One" value="Value one" onChange={() => undefined} />
-            <Input label="Two" value="Value two" onChange={() => undefined} />
-            <Button variant="primary">Submit</Button>
-          </Card>
+          <Authenticator onSetUser={setUser} />
+          <ProjectList projects={projects} />
         </Cards>
       </PageContent>
       <PageFooter>
-        <p>Copyright © 2021 Base Layout UI</p>
+        <p>Copyright © 2021 Semiterrestrial</p>
       </PageFooter>
     </Page>
   );

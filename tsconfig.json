@@ -1,6 +1,7 @@
 {
   "include": [
-    "client/**/*"
+    "client/**/*",
+    "shared/utils/errorUtils.ts"
   ],
   "compilerOptions": {
     "strict": true,

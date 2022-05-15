@@ -7,3 +7,16 @@ export type Variant =
   | 'success'
   | 'primary'
   | 'secondary';
+
+export type User = {
+  email: string;
+  name: string;
+  userId: string;
+  teamId: string;
+};
+
+export type Project = {
+  name: string;
+  projectId: string;
+  status: string;
+};
